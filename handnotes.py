@@ -10,13 +10,17 @@ from datetime import datetime
 from PIL import Image, ImageDraw, ImageTk
 
 
+def clip(x, mn, mx):
+    return max(mn, min(mx, x))
+
+
 class NoteApp:
     def __init__(self, root):
         self.root = root
         self.load_params()
         self.root.title("Draw Note")
         self.root.geometry(f"{self.width}x{self.height}+{self.x}+{self.y}")
-        self.root.attributes("-topmost", False)
+        self.root.attributes("-topmost", 0)
         self.root.attributes("-alpha", 0.5)
         self.root.wm_attributes("-type", "splash")
         self.canvas = tk.Canvas(
@@ -56,6 +60,8 @@ class NoteApp:
         config = configparser.ConfigParser()
         defaults = {
             "ratio": "3",
+            "x": "999",
+            "y": "999",
             "width": "600",
             "height": "400",
             "bg_color": "#dd6",
@@ -76,14 +82,17 @@ class NoteApp:
         self.ratio = int(params.get("ratio", defaults["ratio"]))
         self.width = int(params.get("width", defaults["width"]))
         self.height = int(params.get("height", defaults["height"]))
+        self.x = int(params.get("x", defaults["x"]))
+        self.y = int(params.get("y", defaults["y"]))
         self.bg_color = params.get("bg_color", defaults["bg_color"])
         self.control_bg = params.get("control_bg", defaults["control_bg"])
         self.button_bg = params.get("button_bg", defaults["button_bg"])
         self.button_fg = params.get("button_fg", defaults["button_fg"])
         self.line_color = params.get("line_color", defaults["line_color"])
         self.line_width = int(params.get("line_width", defaults["line_width"]))
-        self.x = self.root.winfo_screenwidth() - self.width
-        self.y = self.root.winfo_screenheight() - self.height
+        ws, hs = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        self.x = clip(self.x, 1, ws - self.width)
+        self.y = clip(self.y, 1, hs - self.height)
         self.notes_dir = config_dir
 
     def create_buttons(self):
