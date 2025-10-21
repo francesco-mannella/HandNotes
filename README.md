@@ -42,6 +42,7 @@ HandNotes uses a configuration file (`handnotes.conf`) to manage user settings. 
 
 - `ratio`: The ratio for scaling the canvas.
 - `width` and `height`: Dimensions of the window.
+- `x` and `y`: Coordinates for the window's starting position on the screen.
 - `bg_color`: Background color of the drawing area.
 - `control_bg`, `button_bg`, `button_fg`: Colors for controls and buttons.
 - `line_color`: Color of drawing lines.
