@@ -3,11 +3,15 @@
 import configparser
 import glob
 import os
-import threading
+import shutil
+import subprocess
 import tkinter as tk
 from datetime import datetime
 
 from PIL import Image, ImageDraw, ImageTk
+
+
+import threading
 
 
 def clip(x, mn, mx):
@@ -18,7 +22,7 @@ class NoteApp:
     def __init__(self, root):
         self.root = root
         self.load_params()
-        self.root.title("Draw Note")
+        self.root.title("HandNotes")
         self.root.geometry(f"{self.width}x{self.height}+{self.x}+{self.y}")
         self.root.attributes("-topmost", 0)
         self.root.attributes("-alpha", 0.5)
@@ -47,9 +51,21 @@ class NoteApp:
         self.control_frame.pack(side=tk.BOTTOM, fill=tk.X)
         self.create_buttons()
         self.tk_img = None
-        self.note_on = False
         self.load_last_note()
         self.update_canvas()
+        threading.Timer(2, self.set_workspace).start()
+
+    def set_workspace(self):
+        if shutil.which("wmctrl"):
+            subprocess.run(
+                [
+                    "wmctrl",
+                    "-r",
+                    "HandNotes",
+                    "-t",
+                    f"{self.workspace}",
+                ]
+            )
 
     def load_params(self):
         config_dir = os.path.join(
@@ -70,6 +86,7 @@ class NoteApp:
             "button_fg": "#fff",
             "line_color": "black",
             "line_width": "3",
+            "workspace": "1",
         }
         if os.path.exists(config_path):
             config.read(config_path)
@@ -90,6 +107,7 @@ class NoteApp:
         self.button_fg = params.get("button_fg", defaults["button_fg"])
         self.line_color = params.get("line_color", defaults["line_color"])
         self.line_width = int(params.get("line_width", defaults["line_width"]))
+        self.workspace = int(params.get("workspace", defaults["workspace"]))
         ws, hs = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
         self.x = clip(self.x, 1, ws - self.width)
         self.y = clip(self.y, 1, hs - self.height)
@@ -128,11 +146,7 @@ class NoteApp:
                     joint="curve",
                 )
         self.last_x, self.last_y = x, y
-        self.update_canvas()
-
-        if self.note_on is False:
-            self.note_on = True
-            self.timer = threading.Timer(10, self.timer_callback).start()
+        self.update_canvas(False)
 
     def erase(self, x, y):
         erase_radius = self.line_width * 10
@@ -141,10 +155,6 @@ class NoteApp:
         self.draw.ellipse(
             [left_up, right_down], fill=self.bg_color, outline=None
         )
-
-    def timer_callback(self):
-        self.save_note()
-        self.note_on = False
 
     def load_last_note(self):
         pattern = os.path.join(self.notes_dir, "note_*.png")
@@ -196,21 +206,25 @@ class NoteApp:
         self.update_canvas()
         print("Note cleared")
 
-    def update_canvas(self):
+    def update_canvas(self, save=True):
         img = self.image.resize(
             (self.width, self.height), resample=Image.LANCZOS
         )
         self.tk_img = ImageTk.PhotoImage(img)
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self.tk_img)
+        if save:
+            self.save_note()
 
     def reset_last_coords(self, event):
         self.last_x = self.last_y = None
+        self.save_note()
 
     def on_start_erase(self, event):
         self.space_pressed = True
 
     def on_end_erase(self, event):
         self.space_pressed = False
+        self.save_note()
 
 
 def main():
