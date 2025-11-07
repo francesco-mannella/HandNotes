@@ -5,13 +5,39 @@ import glob
 import os
 import shutil
 import subprocess
+import threading
 import tkinter as tk
 from datetime import datetime
 
 from PIL import Image, ImageDraw, ImageTk
 
 
-import threading
+class ListManipulator:
+    def __init__(self, maxsize):
+        self._list = []
+        self._index = -1
+        self.maxsize = maxsize
+
+    def add(self, item):
+        self._list.append(item)
+        if len(self._list) > self.maxsize:
+            self._list.pop(0)
+        self._index = len(self._list) - 1
+
+    def previous(self):
+        if self._index > 0:
+            self._index -= 1
+            return self._list[self._index]
+        return None
+
+    def __repr__(self):
+        return str(self._list)
+
+    def next(self):
+        if self._index < len(self._list) - 1:
+            self._index += 1
+            return self._list[self._index]
+        return None
 
 
 def clip(x, mn, mx):
@@ -51,9 +77,22 @@ class NoteApp:
         self.control_frame.pack(side=tk.BOTTOM, fill=tk.X)
         self.create_buttons()
         self.tk_img = None
+        self.initialize_notes()
         self.load_last_note()
         self.update_canvas()
         threading.Timer(2, self.set_workspace).start()
+
+
+    def initialize_notes(self):
+        self.notes = ListManipulator(maxsize=50)
+        pattern = os.path.join(self.notes_dir, "note_*.png")
+        files = glob.glob(pattern)
+        for file in sorted(files, key=os.path.getmtime):
+            try:
+                img = Image.open(file)
+                self.notes.add(img)
+            except Exception as e:
+                print(f"Error loading note {file}: {e}")
 
     def set_workspace(self):
         if shutil.which("wmctrl"):
@@ -117,6 +156,8 @@ class NoteApp:
         buttons = [
             ("Save", self.save_note, tk.LEFT),
             ("Clear", self.clear_note, tk.LEFT),
+            ("<", self.previous_note, tk.LEFT),
+            (">", self.next_note, tk.LEFT),
             ("Exit", self.root.quit, tk.RIGHT),
         ]
         for text, cmd, side in buttons:
@@ -134,6 +175,7 @@ class NoteApp:
             ).pack(side=side, padx=1, pady=1)
 
     def draw_note(self, event):
+        self.canvas.focus_set()
         x, y = event.x * self.ratio, event.y * self.ratio
         if self.space_pressed:
             self.erase(x, y)
@@ -149,6 +191,7 @@ class NoteApp:
         self.update_canvas(False)
 
     def erase(self, x, y):
+        self.canvas.focus_set()
         erase_radius = self.line_width * 10
         left_up = (x - erase_radius, y - erase_radius)
         right_down = (x + erase_radius, y + erase_radius)
@@ -174,6 +217,22 @@ class NoteApp:
             print(f"Error loading last note: {e}")
             return False
 
+    def previous_note(self):
+        prev_img = self.notes.previous()
+        print(self.notes._index)
+        if prev_img:
+            self.image = prev_img.copy()
+            self.draw = ImageDraw.Draw(self.image, "RGBA")
+            self.update_canvas(save=False)
+
+    def next_note(self):
+        next_img = self.notes.next()
+        print(self.notes._index)
+        if next_img:
+            self.image = next_img.copy()
+            self.draw = ImageDraw.Draw(self.image, "RGBA")
+            self.update_canvas(save=False)
+
     def save_note(self):
         try:
             img = self.image.resize(
@@ -181,6 +240,9 @@ class NoteApp:
                 resample=Image.LANCZOS,
             )
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+            self.notes.add(img)
+
             filename = os.path.join(self.notes_dir, f"note_{timestamp}.png")
             img.save(filename)
             print(f"Note saved as {filename}")
@@ -197,6 +259,7 @@ class NoteApp:
             print(f"Error saving note: {e}")
 
     def clear_note(self):
+        self.canvas.focus_set()
         self.image = Image.new(
             "RGB",
             (self.width * self.ratio, self.height * self.ratio),
@@ -229,7 +292,7 @@ class NoteApp:
 
 def main():
     root = tk.Tk()
-    app = NoteApp(root)
+    NoteApp(root)
     root.mainloop()
 
 
