@@ -49,16 +49,24 @@ class NoteApp:
         self.root = root
         self.load_params()
         self.root.title("HandNotes")
-        self.root.geometry(f"{self.width}x{self.height}+{self.x}+{self.y}")
         self.root.attributes("-topmost", 0)
         self.root.attributes("-alpha", 0.5)
         self.root.wm_attributes("-type", "splash")
+        self.control_frame = tk.Frame(root, bg=self.control_bg)
+        self.control_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        self.create_buttons()
+        self.root.update_idletasks()
+        self.menu_height = self.control_frame.winfo_reqheight()
+        total_height = self.height + self.menu_height
+        self.root.geometry(f"{self.width}x{total_height}+{self.x}+{self.y}")
+        canvas_w = self.width // self.ratio if self.ratio > 1 else self.width
+        canvas_h = self.height // self.ratio if self.ratio > 1 else self.height
         self.canvas = tk.Canvas(
             root,
             bg=self.bg_color,
             highlightthickness=0,
-            width=self.width // self.ratio,
-            height=self.height // self.ratio,
+            width=canvas_w,
+            height=canvas_h,
         )
         self.canvas.pack(fill=tk.BOTH, expand=True)
         self.image = Image.new(
@@ -73,15 +81,11 @@ class NoteApp:
         self.canvas.bind("<ButtonRelease-1>", self.reset_last_coords)
         self.canvas.bind("<ButtonPress-3>", self.on_start_erase)
         self.canvas.bind("<ButtonRelease-3>", self.on_end_erase)
-        self.control_frame = tk.Frame(root, bg=self.control_bg)
-        self.control_frame.pack(side=tk.BOTTOM, fill=tk.X)
-        self.create_buttons()
         self.tk_img = None
         self.initialize_notes()
         self.load_last_note()
         self.update_canvas()
         threading.Timer(2, self.set_workspace).start()
-
 
     def initialize_notes(self):
         self.notes = ListManipulator(maxsize=50)
@@ -97,13 +101,7 @@ class NoteApp:
     def set_workspace(self):
         if shutil.which("wmctrl"):
             subprocess.run(
-                [
-                    "wmctrl",
-                    "-r",
-                    "HandNotes",
-                    "-t",
-                    f"{self.workspace}",
-                ]
+                ["wmctrl", "-r", "HandNotes", "-t", f"{self.workspace}"]
             )
 
     def load_params(self):
@@ -240,9 +238,7 @@ class NoteApp:
                 resample=Image.LANCZOS,
             )
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
             self.notes.add(img)
-
             filename = os.path.join(self.notes_dir, f"note_{timestamp}.png")
             img.save(filename)
             print(f"Note saved as {filename}")
@@ -254,7 +250,6 @@ class NoteApp:
             )
             for old_img in images[:-50]:
                 os.remove(os.path.join(self.notes_dir, old_img))
-
         except Exception as e:
             print(f"Error saving note: {e}")
 
